@@ -14,7 +14,7 @@ def main():
     
     server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
     client_socket,addr = server_socket.accept() # wait for client
-    handle_connection()
+    handle_connection(client_socket)
 
 
 if __name__ == "__main__":
