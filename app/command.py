@@ -7,6 +7,7 @@ class Constant:
     NULL_BULK_STRING = "$-1\r\n"
     CLRF = "\r\n"
     TERMINATOR = b"\r\n"
+    REPL = "replication"  
 
 @dataclass
 class Command:
@@ -15,7 +16,7 @@ class Command:
     SET = "set"
     GET = "get"
     INFO = "info"
-    REPL = "replication"  
+    REPLCONF = "replconf"
 
 @dataclass
 class CommandProperties:
@@ -86,9 +87,14 @@ def response_handler(data):
         case Command.INFO:
             if len(input_request) < 5:
                 raise Exception("Invalid Command")
-            if input_request[4].lower() == Command.REPL:
+            if input_request[4].lower() == Constant.REPL:
                 if CommandProperties.ROLE == "master":
                     msg = f"role:{CommandProperties.ROLE}master_replid:{CommandProperties.MASTER_REPLID}master_repl_offset:{CommandProperties.MASTER_REPL_OFFSET}"
                 else:
                     msg = f"role:{CommandProperties.ROLE}"
                 return f"${len(msg)}\r\n{msg}\r\n"
+        
+        case Command.REPLCONF:
+            if len(input_request)<5:
+                raise Exception("Invalid Command")
+            return f"+OK\r\n"

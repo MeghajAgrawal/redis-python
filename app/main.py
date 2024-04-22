@@ -40,6 +40,11 @@ def handle_connection(client_socket, addr):
 def connect_to_master(master_server_address):
     conn = socket.create_connection(master_server_address)
     conn.send("*1\r\n$4\r\nping\r\n".encode())
+    conn.recv(1024)
+    conn.send("*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n6380\r\n".encode())
+    conn.recv(1024)
+    conn.send("*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n".encode())
+    conn.recv(1024)
     return conn
 
 
@@ -62,7 +67,7 @@ def main():
         ServerProperties.MASTER_HOST = parser_args.replicaof[0]
         ServerProperties.MASTER_PORT = parser_args.replicaof[1]
         master = connect_to_master((ServerProperties.MASTER_HOST,ServerProperties.MASTER_PORT))
-        
+
     else:
         ServerProperties.ROLE = Constant.MASTER
         ServerProperties.MASTER_REPLID = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
