@@ -1,6 +1,7 @@
 # Uncomment this to pass the first stage
 import socket
 import threading
+from argparse import ArgumentParser
 import time
 from dataclasses import dataclass
 
@@ -85,8 +86,12 @@ def main():
     print("Logs from your program will appear here!")
 
     # Uncomment this to pass the first stage
-    
-    server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
+    parser = ArgumentParser()
+    parser.add_argument("--port", type= int, default=6379)
+    parser_args = parser.parse_args()
+    server_address  = ("localhost", parser_args.port)
+
+    server_socket = socket.create_server(server_address, reuse_port=True)
     while True:
         try:
             (client_socket,addr) = server_socket.accept() # wait for client
