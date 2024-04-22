@@ -12,6 +12,11 @@ class Constant:
     CLRF = "\r\n"
     TERMINATOR = b"\r\n"
 
+    DEFAULT_PORT = 6379
+    DEFAULT_HOST = "localhost"
+    MASTER = "master"
+    SLAVE = "slave"
+
 @dataclass
 class Command:
     PING = "ping"
@@ -19,7 +24,15 @@ class Command:
     SET = "set"
     GET = "get"
     INFO = "info"
-    REPL = "replication"
+    REPL = "replication"    
+
+@dataclass
+class ServerProperties:
+    ROLE = None
+    HOST = None
+    PORT = None
+    MASTER_HOST = None
+    MASTER_PORT = None
 
 data_store = {}
 
@@ -86,7 +99,8 @@ def response_handler(input_request):
             if len(input_request) < 5:
                 raise Exception("Invalid Command")
             if input_request[4].lower() == Command.REPL:
-                return "$11\r\nrole:master\r\n"
+                msg = f"role:{ServerProperties.ROLE}"
+                return f"${len(msg)}\r\n{msg}\r\n"
 
 
             
@@ -97,9 +111,19 @@ def main():
 
     # Uncomment this to pass the first stage
     parser = ArgumentParser()
-    parser.add_argument("--port", type= int, default=6379)
+    parser.add_argument("--port", type= int, default=Constant.DEFAULT_PORT)
+    parser.add_argument("--replicaof", nargs= 2)
     parser_args = parser.parse_args()
-    server_address  = ("localhost", parser_args.port)
+    server_address  = (Constant.DEFAULT_HOST, parser_args.port)
+
+    ServerProperties.HOST = Constant.DEFAULT_HOST
+    ServerProperties.PORT = parser_args.port
+    ServerProperties.ROLE = Constant.MASTER
+
+    if parser_args.replicaof is not None:
+        ServerProperties.ROLE = Constant.SLAVE
+        ServerProperties.MASTER_HOST = parser_args.replicaof[0]
+        ServerProperties.MASTER_PORT = parser_args.replicaof[1]
 
     server_socket = socket.create_server(server_address, reuse_port=True)
     while True:
