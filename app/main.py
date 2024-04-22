@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from app import command
 
-
 @dataclass
 class Constant:
     DEFAULT_PORT = 6379
@@ -38,6 +37,12 @@ def handle_connection(client_socket, addr):
             except Exception as e:
                 print(e)        
 
+def connect_to_master(master_server_address):
+    conn = socket.create_connection(master_server_address)
+    conn.send("*1\r\n$4\r\nping\r\n".encode())
+    return conn
+
+
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!")
@@ -51,15 +56,18 @@ def main():
 
     ServerProperties.HOST = Constant.DEFAULT_HOST
     ServerProperties.PORT = parser_args.port
-    ServerProperties.ROLE = Constant.MASTER
-    ServerProperties.MASTER_REPLID = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
-    ServerProperties.MASTER_REPL_OFFSET = 0
-
+    
     if parser_args.replicaof is not None:
         ServerProperties.ROLE = Constant.SLAVE
         ServerProperties.MASTER_HOST = parser_args.replicaof[0]
         ServerProperties.MASTER_PORT = parser_args.replicaof[1]
-    
+        master = connect_to_master((ServerProperties.MASTER_HOST,ServerProperties.MASTER_PORT))
+        
+    else:
+        ServerProperties.ROLE = Constant.MASTER
+        ServerProperties.MASTER_REPLID = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
+        ServerProperties.MASTER_REPL_OFFSET = 0
+
     command.receive_server_properties(ServerProperties)
 
     server_socket = socket.create_server(server_address, reuse_port=True)
