@@ -1,14 +1,24 @@
 # Uncomment this to pass the first stage
 import socket
 import threading
+import time
+from dataclasses import dataclass
 
-CLRF = "\r\n"
-PING = "ping"
-ECHO = "echo"
-SET = "set"
-GET = "get"
 
-key_val_dict = {}
+@dataclass
+class Constant:
+    NULL_BULK_STRING = "$-1\r\n"
+    CLRF = "\r\n"
+    TERMINATOR = b"\r\n"
+
+@dataclass
+class Command:
+    PING = "ping"
+    ECHO = "echo"
+    SET = "set"
+    GET = "get"
+
+data_store = {}
 
 def handle_connection(client_socket, addr):
     with client_socket:
@@ -26,7 +36,7 @@ def handle_connection(client_socket, addr):
                 print(e)
 
 def command_decoder(data):
-    input_request = data.split(CLRF)
+    input_request = data.split(Constant.CLRF)
     print(input_request)
     if input_request[-1] == "":
         input_request.pop()
@@ -37,28 +47,38 @@ def command_decoder(data):
 def response_handler(input_request):
     command = input_request[2]
     match command.lower():
-        case "ping":
+        case Command.PING:
             return "+PONG\r\n"
-        case "echo":
+        
+        case Command.ECHO:
             if len(input_request) < 5:
                 raise Exception("Invalid Command")
             msg = input_request[4]
             return f"${len(msg)}\r\n{input_request[4]}\r\n"
-        case "set":
+        
+        case Command.SET:
             if len(input_request) < 7:
                 raise Exception("Invalid Command")
             key = input_request[4]
             value = input_request[6]
-            key_val_dict[key] = value
+            data_store[key] = {"value" : value, "px": None}
+            if len(input_request) > 7:
+                px_time = int(input_request[10])
+                data_store[key]["px"] = time.time() * 1000 + px_time
             return f"+OK\r\n"
-        case "get":
+        
+        case Command.GET:
             if len(input_request) < 5:
                 raise Exception("Invalid Command")
             key = input_request[4]
-            if key not in key_val_dict:
-                return "$-1\r\n"
-            value = key_val_dict[key]
-            return f"${len(value)}\r\n{value}\r\n"
+            current_time = time.time() * 1000
+            if key in data_store:
+                if not data_store[key]["px"] or current_time < data_store[key]["px"]:
+                    value = data_store[key]["value"]
+                    return f"${len(value)}\r\n{value}\r\n"
+                data_store.pop(key)
+            return Constant.NULL_BULK_STRING
+            
 
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
