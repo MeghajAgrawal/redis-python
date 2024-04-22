@@ -9,7 +9,33 @@ def handle_connection(client_socket, addr):
             if not data:
                 print("client at", addr, " broke connection")
                 break
-            client_socket.send("+PONG\r\n".encode())
+            #client_socket.send("+PONG\r\n".encode())
+            try:
+                input_request = command_decoder(data.decode())
+                msg = response_handler(input_request)
+                client_socket.send(msg.encode())
+            except Exception as e:
+                print(e)
+
+def command_decoder(data):
+    input_request = data.split("\r\n")
+    print(input_request)
+    if input_request[-1] == "":
+        input_request.pop()
+    if len(input_request) < 3:
+        raise Exception("Invalid Command")
+    return input_request
+
+def response_handler(input_request):
+    command = input_request[2]
+    match command.lower():
+        case "ping":
+            return "+PONG\r\n"
+        case "echo":
+            if len(input_request) < 5:
+                raise Exception("Invalid Command")
+            msg = input_request[4]
+            return f"${len(msg)}\r\n{input_request[4]}\r\n"
 
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
