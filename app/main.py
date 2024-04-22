@@ -2,39 +2,27 @@
 import socket
 import threading
 from argparse import ArgumentParser
-import time
 from dataclasses import dataclass
+
+from app import command
 
 
 @dataclass
 class Constant:
-    NULL_BULK_STRING = "$-1\r\n"
-    CLRF = "\r\n"
-    TERMINATOR = b"\r\n"
-
     DEFAULT_PORT = 6379
     DEFAULT_HOST = "localhost"
     MASTER = "master"
     SLAVE = "slave"
 
 @dataclass
-class Command:
-    PING = "ping"
-    ECHO = "echo"
-    SET = "set"
-    GET = "get"
-    INFO = "info"
-    REPL = "replication"    
-
-@dataclass
 class ServerProperties:
     ROLE = None
     HOST = None
     PORT = None
+    MASTER_REPLID = None
+    MASTER_REPL_OFFSET = None
     MASTER_HOST = None
     MASTER_PORT = None
-
-data_store = {}
 
 def handle_connection(client_socket, addr):
     with client_socket:
@@ -45,65 +33,10 @@ def handle_connection(client_socket, addr):
                 break
             #client_socket.send("+PONG\r\n".encode())
             try:
-                input_request = command_decoder(data.decode())
-                msg = response_handler(input_request)
+                msg = command.response_handler(data.decode())
                 client_socket.send(msg.encode())
             except Exception as e:
-                print(e)
-
-def command_decoder(data):
-    input_request = data.split(Constant.CLRF)
-    print(input_request)
-    if input_request[-1] == "":
-        input_request.pop()
-    if len(input_request) < 3:
-        raise Exception("Invalid Command")
-    return input_request
-
-def response_handler(input_request):
-    command = input_request[2]
-    match command.lower():
-        case Command.PING:
-            return "+PONG\r\n"
-        
-        case Command.ECHO:
-            if len(input_request) < 5:
-                raise Exception("Invalid Command")
-            msg = input_request[4]
-            return f"${len(msg)}\r\n{input_request[4]}\r\n"
-        
-        case Command.SET:
-            if len(input_request) < 7:
-                raise Exception("Invalid Command")
-            key = input_request[4]
-            value = input_request[6]
-            data_store[key] = {"value" : value, "px": None}
-            if len(input_request) > 7:
-                px_time = int(input_request[10])
-                data_store[key]["px"] = time.time() * 1000 + px_time
-            return f"+OK\r\n"
-        
-        case Command.GET:
-            if len(input_request) < 5:
-                raise Exception("Invalid Command")
-            key = input_request[4]
-            current_time = time.time() * 1000
-            if key in data_store:
-                if not data_store[key]["px"] or current_time < data_store[key]["px"]:
-                    value = data_store[key]["value"]
-                    return f"${len(value)}\r\n{value}\r\n"
-                data_store.pop(key)
-            return Constant.NULL_BULK_STRING
-        
-        case Command.INFO:
-            if len(input_request) < 5:
-                raise Exception("Invalid Command")
-            if input_request[4].lower() == Command.REPL:
-                msg = f"role:{ServerProperties.ROLE}"
-                return f"${len(msg)}\r\n{msg}\r\n"
-
-
-            
+                print(e)        
 
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -119,11 +52,15 @@ def main():
     ServerProperties.HOST = Constant.DEFAULT_HOST
     ServerProperties.PORT = parser_args.port
     ServerProperties.ROLE = Constant.MASTER
+    ServerProperties.MASTER_REPLID = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
+    ServerProperties.MASTER_REPL_OFFSET = 0
 
     if parser_args.replicaof is not None:
         ServerProperties.ROLE = Constant.SLAVE
         ServerProperties.MASTER_HOST = parser_args.replicaof[0]
         ServerProperties.MASTER_PORT = parser_args.replicaof[1]
+    
+    command.receive_server_properties(ServerProperties)
 
     server_socket = socket.create_server(server_address, reuse_port=True)
     while True:
@@ -134,8 +71,6 @@ def main():
             #handle_connection(client_socket)
         except Exception as e:
             print("Exception occurred:", e)
-
-
 
 if __name__ == "__main__":
     main()
