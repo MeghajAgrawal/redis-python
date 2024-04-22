@@ -18,6 +18,8 @@ class Command:
     ECHO = "echo"
     SET = "set"
     GET = "get"
+    INFO = "info"
+    REPL = "replication"
 
 data_store = {}
 
@@ -79,6 +81,14 @@ def response_handler(input_request):
                     return f"${len(value)}\r\n{value}\r\n"
                 data_store.pop(key)
             return Constant.NULL_BULK_STRING
+        
+        case Command.INFO:
+            if len(input_request) < 5:
+                raise Exception("Invalid Command")
+            if input_request[4].lower() == Command.REPL:
+                return "$11\r\nrole:master\r\n"
+
+
             
 
 def main():
