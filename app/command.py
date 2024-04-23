@@ -17,6 +17,7 @@ class Command:
     GET = "get"
     INFO = "info"
     REPLCONF = "replconf"
+    PSYNC = "psync"
 
 @dataclass
 class CommandProperties:
@@ -98,3 +99,9 @@ def response_handler(data):
             if len(input_request)<5:
                 raise Exception("Invalid Command")
             return f"+OK\r\n"
+
+        case Command.PSYNC:
+            if len(input_request) < 7:
+                raise Exception("Invalid Command")
+            repl_id = input_request[4]
+            return f"+FULLRESYNC {repl_id} 0\r\n"
