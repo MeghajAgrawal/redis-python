@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass
 import base64
+import socket
 
 RDB_64 = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
 
@@ -9,7 +10,8 @@ class Constant:
     NULL_BULK_STRING = b"$-1\r\n"
     CLRF = "\r\n"
     TERMINATOR = b"\r\n"
-    REPL = "replication"  
+    REPL = "replication" 
+    MASTER = "master"
 
 @dataclass
 class Command:
@@ -32,6 +34,9 @@ class CommandProperties:
     MASTER_PORT = None
 
 data_store = {}
+replicas = set()
+
+command_array = set(Command.SET)
 
 def receive_server_properties(server_properties):
     CommandProperties.ROLE = server_properties.ROLE
@@ -56,7 +61,7 @@ def command_decoder(data):
         raise Exception("Invalid Command")
     return input_request
 
-def response_handler(data):
+def response_handler(data,conn):
     input_request = command_decoder(data)
     command = input_request[2]
     match command.lower():
@@ -72,13 +77,18 @@ def response_handler(data):
         case Command.SET:
             if len(input_request) < 7:
                 raise Exception("Invalid Command")
+            print("Inside SET Command ", CommandProperties.ROLE, "\n", CommandProperties.PORT)
             key = input_request[4]
             value = input_request[6]
             data_store[key] = {"value" : value, "px": None}
             if len(input_request) > 7:
                 px_time = int(input_request[10])
                 data_store[key]["px"] = time.time() * 1000 + px_time
-            return [encode(f"+OK\r\n")]
+            if CommandProperties.ROLE == Constant.MASTER:
+                print(replicas)
+                for replica in replicas:
+                    replica.send(data.encode())
+                return [encode(f"+OK\r\n")]
         
         case Command.GET:
             if len(input_request) < 5:
@@ -116,6 +126,7 @@ def response_handler(data):
                 binary_data = base64.b64decode(RDB_64)
                 msg_list.append(encode(b"$" + str(len(binary_data)).encode() +b"\r\n" + binary_data))
                 print(msg_list)
+            replicas.add(conn)
             return msg_list
         
         

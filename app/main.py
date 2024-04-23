@@ -35,11 +35,11 @@ def handle_connection(client_socket, addr):
                 break
             #client_socket.send("+PONG\r\n".encode())
             try:
-                msgs = command.response_handler(data.decode())
+                msgs = command.response_handler(data.decode(), client_socket)
                 for msg in msgs:
                     client_socket.send(msg)
             except Exception as e:
-                print(e)        
+                print(e)
 
 def connect_to_master(master_server_address):
     conn = socket.create_connection(master_server_address)
@@ -52,7 +52,6 @@ def connect_to_master(master_server_address):
     conn.send("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n".encode())
     conn.recv(1024)
     return conn
-
 
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -84,12 +83,12 @@ def main():
     server_socket = socket.create_server(server_address, reuse_port=True)
     while True:
         try:
-            (client_socket,addr) = server_socket.accept() # wait for client
-            thread = threading.Thread(target=handle_connection, args= (client_socket,addr))
+            (client_socket, addr) = server_socket.accept() # wait for client
+            thread = threading.Thread(target=handle_connection, args= (client_socket, addr))
             thread.start()
             #handle_connection(client_socket)
         except Exception as e:
-            print("Exception occurred:", e)
+            print("Exception occurred:", e) 
 
 if __name__ == "__main__":
     main()
