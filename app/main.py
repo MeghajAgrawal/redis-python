@@ -3,8 +3,11 @@ import socket
 import threading
 from argparse import ArgumentParser
 from dataclasses import dataclass
-
+import base64
 from app import command
+
+
+RDB_File = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2"
 
 @dataclass
 class Constant:
@@ -32,8 +35,9 @@ def handle_connection(client_socket, addr):
                 break
             #client_socket.send("+PONG\r\n".encode())
             try:
-                msg = command.response_handler(data.decode())
-                client_socket.send(msg.encode())
+                msgs = command.response_handler(data.decode())
+                for msg in msgs:
+                    client_socket.send(msg)
             except Exception as e:
                 print(e)        
 

@@ -1,10 +1,12 @@
 import time
 from dataclasses import dataclass
+import base64
 
+RDB_64 = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
 
 @dataclass
 class Constant:
-    NULL_BULK_STRING = "$-1\r\n"
+    NULL_BULK_STRING = b"$-1\r\n"
     CLRF = "\r\n"
     TERMINATOR = b"\r\n"
     REPL = "replication"  
@@ -40,6 +42,11 @@ def receive_server_properties(server_properties):
     CommandProperties.MASTER_HOST = server_properties.MASTER_HOST
     CommandProperties.MASTER_PORT = server_properties.MASTER_PORT
 
+def encode(msg):
+    if type(msg) is str:
+        return msg.encode()
+    return msg
+
 def command_decoder(data):
     input_request = data.split(Constant.CLRF)
     print(input_request)
@@ -54,13 +61,13 @@ def response_handler(data):
     command = input_request[2]
     match command.lower():
         case Command.PING:
-            return "+PONG\r\n"
+            return [encode("+PONG\r\n")]
         
         case Command.ECHO:
             if len(input_request) < 5:
                 raise Exception("Invalid Command")
             msg = input_request[4]
-            return f"${len(msg)}\r\n{input_request[4]}\r\n"
+            return [encode(f"${len(msg)}\r\n{input_request[4]}\r\n")]
         
         case Command.SET:
             if len(input_request) < 7:
@@ -71,7 +78,7 @@ def response_handler(data):
             if len(input_request) > 7:
                 px_time = int(input_request[10])
                 data_store[key]["px"] = time.time() * 1000 + px_time
-            return f"+OK\r\n"
+            return [encode(f"+OK\r\n")]
         
         case Command.GET:
             if len(input_request) < 5:
@@ -81,9 +88,9 @@ def response_handler(data):
             if key in data_store:
                 if not data_store[key]["px"] or current_time < data_store[key]["px"]:
                     value = data_store[key]["value"]
-                    return f"${len(value)}\r\n{value}\r\n"
+                    return [encode(f"${len(value)}\r\n{value}\r\n")]
                 data_store.pop(key)
-            return Constant.NULL_BULK_STRING
+            return [Constant.NULL_BULK_STRING]
         
         case Command.INFO:
             if len(input_request) < 5:
@@ -93,15 +100,22 @@ def response_handler(data):
                     msg = f"role:{CommandProperties.ROLE}master_replid:{CommandProperties.MASTER_REPLID}master_repl_offset:{CommandProperties.MASTER_REPL_OFFSET}"
                 else:
                     msg = f"role:{CommandProperties.ROLE}"
-                return f"${len(msg)}\r\n{msg}\r\n"
+                return [encode(f"${len(msg)}\r\n{msg}\r\n")]
         
         case Command.REPLCONF:
             if len(input_request)<5:
                 raise Exception("Invalid Command")
-            return f"+OK\r\n"
+            return [encode(f"+OK\r\n")]
 
         case Command.PSYNC:
             if len(input_request) < 7:
                 raise Exception("Invalid Command")
-            repl_id = CommandProperties.MASTER_REPLID #input_request[4]
-            return f"+FULLRESYNC {repl_id} 0\r\n"
+            repl_id = CommandProperties.MASTER_REPLID
+            msg_list = [encode(f"+FULLRESYNC {repl_id} 0\r\n")]
+            if input_request[4] == "?" and input_request[6] == '-1':
+                binary_data = base64.b64decode(RDB_64)
+                msg_list.append(encode(b"$" + str(len(binary_data)).encode() +b"\r\n" + binary_data))
+                print(msg_list)
+            return msg_list
+        
+        
