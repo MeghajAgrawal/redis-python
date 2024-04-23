@@ -98,7 +98,7 @@ def response_handler(data):
         case Command.REPLCONF:
             if len(input_request)<5:
                 raise Exception("Invalid Command")
-            return f"+OK\r\n"
+            return f"+OK\r\n" 
 
         case Command.PSYNC:
             if len(input_request) < 7:
