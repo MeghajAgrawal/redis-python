@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from dataclasses import dataclass
 import base64
 from app import command
-
+import time
 
 RDB_File = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2"
 
@@ -35,8 +35,12 @@ def handle_connection(client_socket, addr):
                 break
             #client_socket.send("+PONG\r\n".encode())
             try:
-                if not data.__contains__(b'REDIS'):
-                    command.response_handler(data.decode(), client_socket)
+                data = data.split(b"*")[1:]
+                for item in data:
+                    if not item.__contains__(b'REDIS') and len(item.decode()) > 2:
+                        #print("Data to be processed", item.decode())
+                        item = b"*" + item
+                        command.response_handler(item.decode(), client_socket)
                     
             except Exception as e:
                 print(e)
@@ -50,7 +54,9 @@ def connect_to_master(master_server_address):
     conn.send("*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n".encode())
     conn.recv(1024)
     conn.send("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n".encode())
-    conn.recv(1024)
+    # # REPL GETACK
+    # conn.send("*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n".encode())
+    # conn.recv(1024)
     return conn
 
 def main():
@@ -71,6 +77,7 @@ def main():
         ServerProperties.ROLE = Constant.SLAVE
         ServerProperties.MASTER_HOST = parser_args.replicaof[0]
         ServerProperties.MASTER_PORT = parser_args.replicaof[1]
+        command.receive_server_properties(ServerProperties)
         master = connect_to_master((ServerProperties.MASTER_HOST,ServerProperties.MASTER_PORT))
         thread = threading.Thread(target=handle_connection , args=(master, ServerProperties.PORT))
         thread.start()
