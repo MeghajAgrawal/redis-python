@@ -35,9 +35,9 @@ def handle_connection(client_socket, addr):
                 break
             #client_socket.send("+PONG\r\n".encode())
             try:
-                msgs = command.response_handler(data.decode(), client_socket)
-                for msg in msgs:
-                    client_socket.send(msg)
+                if not data.__contains__(b'REDIS'):
+                    command.response_handler(data.decode(), client_socket)
+                    
             except Exception as e:
                 print(e)
 
@@ -72,6 +72,8 @@ def main():
         ServerProperties.MASTER_HOST = parser_args.replicaof[0]
         ServerProperties.MASTER_PORT = parser_args.replicaof[1]
         master = connect_to_master((ServerProperties.MASTER_HOST,ServerProperties.MASTER_PORT))
+        thread = threading.Thread(target=handle_connection , args=(master, ServerProperties.PORT))
+        thread.start()
 
     else:
         ServerProperties.ROLE = Constant.MASTER
