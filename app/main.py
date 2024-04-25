@@ -43,7 +43,7 @@ def handle_connection(client_socket, addr):
                         command.response_handler(item.decode(), client_socket)
                     
             except Exception as e:
-                print(e)
+                print("Exception occurred in handle connection" , e)
 
 def connect_to_master(master_server_address):
     conn = socket.create_connection(master_server_address)
