@@ -41,8 +41,10 @@ replicas = set()
 
 command_array = set(Command.SET)
 
-current_offset = 0
-offset = 0
+@dataclass
+class Offset:
+    current_offset = 0
+    offset = 0
 
 def receive_server_properties(server_properties):
     CommandProperties.ROLE = server_properties.ROLE
@@ -68,20 +70,25 @@ def command_decoder(data):
         raise Exception("Invalid Command")
     return input_request
 
+def is_master(conn,msg):
+    if CommandProperties.ROLE == Constant.MASTER:
+        return conn.send(msg)
+
+
 def response_handler(data,conn):
-    offset = current_offset
-    print(len(data))
+    Offset.offset = Offset.current_offset
+    print(Offset.offset)
     input_request = command_decoder(data)
     command = input_request[2]
-    current_offset += len(data)
+    Offset.current_offset += len(data)
     match command.lower():
         case Command.PING:
-            return conn.send(encode("+PONG\r\n"))
+            return is_master(conn,encode("+PONG\r\n"))
         case Command.ECHO:
             if len(input_request) < 5:
                 raise Exception("Invalid Command")
             msg = input_request[4]
-            return conn.send(encode(f"${len(msg)}\r\n{input_request[4]}\r\n"))
+            return is_master(conn, encode(f"${len(msg)}\r\n{input_request[4]}\r\n"))
         
         case Command.SET:
             if len(input_request) < 7:
@@ -96,7 +103,6 @@ def response_handler(data,conn):
             if CommandProperties.ROLE == Constant.MASTER:
                 #print("Current Replicas to send ", replicas)
                 for replica in replicas:
-                    
                     replica.send(data.encode())
                 return conn.send(encode(f"+OK\r\n"))
         
@@ -130,10 +136,10 @@ def response_handler(data,conn):
             #print("INSIDE REPLCONF" , CommandProperties.ROLE)
             #print("input request", input_request)
             if input_request[4].lower() == Command.GETACK:
-                current_offset += 3
+                Offset.current_offset += 3
                 if CommandProperties.ROLE == Constant.SLAVE:
                     #print("INSIDE SLAVE CONN SEND ACK")
-                    conn.send(encode(f"*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n{offset}\r\n"))
+                    conn.send(encode(f"*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(Offset.offset))}\r\n{Offset.offset}\r\n"))
             if input_request[4] == Command.ACK:
                 offset = input_request[7]
                 CommandProperties.MASTER_REPL_OFFSET = offset
