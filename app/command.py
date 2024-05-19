@@ -41,7 +41,6 @@ replicas = {}
 
 set_count = 0
 
-# enter glabal vars
 num_replicas_ack = 0
 num_replica_ack_cond = threading.Condition() 
 
@@ -142,10 +141,11 @@ def response_handler(data,conn):
             if input_request[4] == Command.ACK:
                 if CommandProperties.ROLE == Constant.MASTER:
                     replicas[conn] = int(input_request[7])
-                    
+                    print("Replica sent ACK")
                     global num_replicas_ack
                     num_replica_ack_cond.acquire()
                     num_replicas_ack += 1
+                    print(num_replicas_ack)
                     num_replica_ack_cond.release()
 
             is_master(conn,encode(f"+OK\r\n"))
