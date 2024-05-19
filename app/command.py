@@ -81,7 +81,7 @@ def is_master(conn,msg):
 def response_handler(data,conn):
     input_request = command_decoder(data)
     command = input_request[2]
-    
+    global num_replicas_ack
     match command.lower():
         case Command.PING:
             is_master(conn,encode("+PONG\r\n"))
@@ -104,7 +104,7 @@ def response_handler(data,conn):
                 #print("Current Replicas to send ", replicas)
                 for replica in replicas.keys():
                     replica.send(data.encode())
-                    replica.send(b"*3\r\n$8\r\nreplconf\r\n$6\r\nGETACK\r\n$1\r\n*\r\n")
+                    
                 conn.send(encode(f"+OK\r\n"))
     
         case Command.GET:
@@ -132,21 +132,21 @@ def response_handler(data,conn):
         
         case Command.REPLCONF:
             raise_error(len(input_request), 3)
-            #print("INSIDE REPLCONF" , CommandProperties.ROLE)
-            #print("input request", input_request)
+            print("INSIDE REPLCONF" , CommandProperties.ROLE)
+            print("input request", input_request)
+            global num_replicas_ack
             if input_request[4].lower() == Command.GETACK:
                 if CommandProperties.ROLE == Constant.SLAVE:
                     conn.send(encode(f"*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(Offset.offset))}\r\n{Offset.offset}\r\n"))
                 Offset.offset += 3
             if input_request[4] == Command.ACK:
                 if CommandProperties.ROLE == Constant.MASTER:
-                    replicas[conn] = int(input_request[7])
+                    #replicas[conn] = int(input_request[7])
                     print("Replica sent ACK")
-                    global num_replicas_ack
-                    num_replica_ack_cond.acquire()
-                    num_replicas_ack += 1
-                    print(num_replicas_ack)
-                    num_replica_ack_cond.release()
+                    #num_replica_ack_cond.acquire()
+                    #num_replicas_ack += 1
+                    #print(num_replicas_ack)
+                    #num_replica_ack_cond.release()
 
             is_master(conn,encode(f"+OK\r\n"))
         
@@ -163,12 +163,13 @@ def response_handler(data,conn):
         case Command.WAIT:
             print("OFFSET is" , Offset.offset)
             raise_error(len(input_request), 3)
-            global num_replicas_ack
             replicas_required = int(input_request[4])
             timeout = int(input_request[6])
-            start_timer = time.time() * 1000
+            start_timer = time.time()
+            for replica in replicas.keys():
+                replica.send(b"*3\r\n$8\r\nreplconf\r\n$6\r\nGETACK\r\n$1\r\n*\r\n")
             while True:
-                current_time = time.time() * 1000
+                current_time = time.time()
                 if current_time - start_timer >= timeout:
                     break
                 if num_replicas_ack >= replicas_required:
